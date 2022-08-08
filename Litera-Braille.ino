@@ -45,6 +45,10 @@ int countCaracteres = 0;
 int countLinhas = 0;
 int maxCaracteresLinha = 30;
 int maxLinhas = 30;
+int tempoSaltarLinha = 50;
+int tempoSaltarEspaco = 50;
+int tempoPercorrerLinha = 300; //calcular
+int tempoAjustarNovaPagina = 500; //calcular
 
 
 // **** Declaração das funções ****
@@ -176,35 +180,41 @@ void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int s
   
 }
 
+void saltarEspaco(){
+  countCaracteres++;
+  if (countCaracteres >= maxCaracteresLinha){
+    saltarLinha();
+    countCaracteres = 0;
+    return;
+  }
+  analogWrite(motorLetrasDir, espaco);
+  delay(tempoSaltarEspaco);
+  digitalWrite(motorLetrasDir, LOW);
+}
+
 void saltarLinha(){
-  analogWrite(motorLinhaFrente, linha);
-  delay(50);
-  digitalWrite(motorLinhaFrente, LOW);
+  voltarInicioLinha();
   countLinhas++;
   if (countLinhas >= maxLinhas){
     puxarNovaPagina();
     countLinhas = 0;
+    return;
   }
-}
-
-void saltarEspaco(){
-  analogWrite(motorLetrasDir, espaco);
-  delay(50);
-  digitalWrite(motorLetrasDir, LOW);
-  countCaracteres++;
-  if (countCaracteres >= maxCaracteresLinha){
-    saltarLinha();
-    voltarInicioLinha();
-    countCaracteres = 0;
-  }
+  analogWrite(motorLinhaFrente, linha);
+  delay(tempoSaltarLinha);
+  digitalWrite(motorLinhaFrente, LOW);
 }
 
 void voltarInicioLinha(){
-  
+  analogWrite(motorLetrasEsq, espaco);
+  delay(tempoPercorrerLinha);
+  digitalWrite(motorLetrasEsq, LOW);
 }
 
 void puxarNovaPagina(){
-  
+  analogWrite(motorLinhaFrente, linha);
+  delay(tempoAjustarNovaPagina);
+  digitalWrite(motorLinhaFrente, LOW);
 }
 
 void resetarStatus(){
