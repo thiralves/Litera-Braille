@@ -4,13 +4,13 @@
 
 // **** Constantes ****
 #define botao1 22 //porta serial
-#define botao2 23 //porta serial
-#define botao3 24 //porta serial
-#define botao4 25 //porta serial
-#define botao5 26 //porta serial
-#define botao6 27 //porta serial
-#define botaoEspaco 28 //porta serial
-#define botaoLinha 29 //porta serial
+#define botao2 24 //porta serial
+#define botao3 26 //porta serial
+#define botao4 28 //porta serial
+#define botao5 30 //porta serial
+#define botao6 32 //porta serial
+#define botaoEspaco 34 //porta serial
+#define botaoLinha 36 //porta serial
 
 #define portaServo1_4 2 
 #define portaServo2_3 3
@@ -22,37 +22,37 @@
 #define motorLinhaFrente 10
 #define motorLinhaTras 11
 
-#define espaco 100 // porta analógica PWM de 0 a 255
-#define linha 200
+#define espaco 100 // PWM de 0 a 255
+#define linha 200 // PWM de 0 a 255
 
 //Posições pré-definidas para os servomotores que marcam os pontos do Braille
-#define centro 90
-#define direita 60
-#define esquerda 120
-
+#define centro 90 // 90º
+#define direita 70 // 70º
+#define esquerda 110 // 110º - diferença de 20º entre o centro e o giro para um lado ou para o outro
 
 // **** Variáveis ****
-Servo servo1_4, servo2_3, servo5_6;
-int status_botao1 = 0; // 1 <- Identificador
-int status_botao2 = 0; // 2 <- Identificador
-int status_botao3 = 0; // 3 <- Identificador
-int status_botao4 = 0; // 4 <- Identificador
-int status_botao5 = 0; // 5 <- Identificador
-int status_botao6 = 0; // 6 <- Identificador
-int status_botaoEspaco = 0; // 7 <- Identificador
-int status_botaoLinha = 0; // 8 <- Identificador
+Servo servo1_4, servo2_3, servo5_6; //servo1_4, por exemplo, é responsável por marcar os pontos 1 e 4 da Cela Braille
+int status_botao1 = 0;
+int status_botao2 = 0;
+int status_botao3 = 0;
+int status_botao4 = 0;
+int status_botao5 = 0;
+int status_botao6 = 0;
+int status_botaoEspaco = 0;
+int status_botaoLinha = 0;
 int countCaracteres = 0;
 int countLinhas = 0;
-int maxCaracteresLinha = 30;
-int maxLinhas = 30;
-int tempoSaltarLinha = 50;
-int tempoSaltarEspaco = 50;
-int tempoPercorrerLinha = 300; //calcular
-int tempoAjustarNovaPagina = 500; //calcular
-
+int maxCaracteresLinha = 30; // ainda precisa calcular corretamente
+int maxLinhas = 30; // ainda precisa calcular corretamente
+int tempoEntreGiros = 300;
+int tempoSaltarLinha = 50; // ainda precisa calcular corretamente
+int tempoSaltarEspaco = 50; // ainda precisa calcular corretamente
+int tempoPercorrerLinha = 300; // ainda precisa calcular corretamente
+int tempoAjustarNovaPagina = 500; // ainda precisa calcular corretamente
 
 // **** Declaração das funções ****
 void lerBotoes();
+bool temBotaoPressionado();
 void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int status_botao4, int status_botao5, int status_botao6, int status_botaoEspaco);
 void saltarLinha();
 void saltarEspaco();
@@ -100,8 +100,12 @@ void loop() {
   }else{
     if((status_botao1 && !digitalRead(botao1)) || (status_botao2 && !digitalRead(botao2)) || (status_botao3 && !digitalRead(botao3)) || (status_botao4 && !digitalRead(botao4))
                || (status_botao5 && !digitalRead(botao5)) || (status_botao6 && !digitalRead(botao6)) || (status_botaoEspaco && !digitalRead(botaoEspaco))){
-      marcarPontos(status_botao1, status_botao2, status_botao3, status_botao4, status_botao5, status_botao6, status_botaoEspaco);
-      resetarStatus();
+	  //delay(300);
+	  while(temBotaoPressionado()){
+		delay(10);
+	  }
+	  marcarPontos(status_botao1, status_botao2, status_botao3, status_botao4, status_botao5, status_botao6, status_botaoEspaco);
+	  resetarStatus();
     }
   }
 }
@@ -143,6 +147,10 @@ void lerBotoes(){
   }
 }
 
+bool temBotaoPressionado(){
+	return digitalRead(botao1) || digitalRead(botao2) || digitalRead(botao3) || digitalRead(botao4) || digitalRead(botao5) || digitalRead(botao6) || digitalRead(botaoEspaco);
+}
+
 void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int status_botao4, int status_botao5, int status_botao6, int status_botaoEspaco){
   if(status_botao1){
     servo1_4.write(direita);
@@ -155,7 +163,7 @@ void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int s
   }
 
   if(status_botao1 || status_botao3 || status_botao5){
-    delay(200);
+    delay(tempoEntreGiros);
   }
   
   if(status_botao2){
@@ -169,7 +177,7 @@ void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int s
   }
 
   if(status_botao2 || status_botao4 || status_botao6){
-    delay(200);
+    delay(tempoEntreGiros);
   }
   
   servo1_4.write(centro);
@@ -218,12 +226,12 @@ void puxarNovaPagina(){
 }
 
 void resetarStatus(){
-    status_botao1 = 0; // 1 <- Identificador
-    status_botao2 = 0; // 2 <- Identificador
-    status_botao3 = 0; // 3 <- Identificador
-    status_botao4 = 0; // 4 <- Identificador
-    status_botao5 = 0; // 5 <- Identificador
-    status_botao6 = 0; // 6 <- Identificador
-    status_botaoEspaco = 0; // 7 <- Identificador
-    status_botaoLinha = 0; // 8 <- Identificador
+    status_botao1 = 0;
+    status_botao2 = 0;
+    status_botao3 = 0;
+    status_botao4 = 0;
+    status_botao5 = 0;
+    status_botao6 = 0;
+    status_botaoEspaco = 0;
+    status_botaoLinha = 0;
 }
