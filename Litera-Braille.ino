@@ -2,6 +2,7 @@
 #include <Servo.h>
 
 
+
 // **** Constantes ****
 #define botao1 22 //porta serial
 #define botao2 24 //porta serial
@@ -11,6 +12,7 @@
 #define botao6 32 //porta serial
 #define botaoEspaco 34 //porta serial
 #define botaoLinha 36 //porta serial
+#define botaoReset 40 // botão para reiniciar o programa, por exemplo, para iniciar uma digitação
 
 #define portaServo1_4 2 
 #define portaServo2_3 3
@@ -92,6 +94,9 @@ void setup() {
 
 void loop() {
   lerBotoes();
+  if (digitalRead(botaoReset)){
+	  asm volatile ("  jmp 0");
+  }
   if (status_botaoLinha){
     if(!digitalRead(botaoLinha)){
       saltarLinha();
@@ -109,8 +114,6 @@ void loop() {
     }
   }
 }
-
-
 
 void lerBotoes(){
 
@@ -164,6 +167,10 @@ void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int s
 
   if(status_botao1 || status_botao3 || status_botao5){
     delay(tempoEntreGiros);
+    servo1_4.write(centro);
+    servo2_3.write(centro);
+    servo5_6.write(centro);
+    delay(tempoRetornarCentro);
   }
   
   if(status_botao2){
@@ -178,14 +185,13 @@ void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int s
 
   if(status_botao2 || status_botao4 || status_botao6){
     delay(tempoEntreGiros);
+    servo1_4.write(centro);
+    servo2_3.write(centro);
+    servo5_6.write(centro);
+    delay(tempoRetornarCentro);
   }
-  
-  servo1_4.write(centro);
-  servo2_3.write(centro);
-  servo5_6.write(centro);
 
   saltarEspaco();
-  
 }
 
 void saltarEspaco(){
