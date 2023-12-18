@@ -11,13 +11,16 @@
 #define botao5 33 //porta serial
 #define botao6 35 //porta serial
 #define botaoEspaco 29 //porta serial
-#define botaoLinha 37 //porta serial
-#define botaoPosicaoInicial 39 //porta para botão que posiciona a página para inicar digitação
-#define portaServo1_4 10
-#define portaServo2_3 9
-#define portaServo5_6 2
+#define botaoApagar 37 //porta serial
+#define botaoRetroceder 39 //porta para botão que retorna a cabeça de impressão para aposição do caractere anterior
+#define botaoPosicaoInicial 41 //porta para botão que posiciona a página para inicar digitação
+#define botaoLinha 45 //porta serial
+#define portaServo1_4 2
+#define portaServo2_3 10
+#define portaServo5_6 9
 #define buzzer 51
 #define fimDeCurso 48
+#define solenoide 47
 
 /*
  * SINGLE: As bobinas são energizadas de maneira individual e possuem um torque razoável.
@@ -28,24 +31,29 @@
 #define metodoMotorPasso INTERLEAVE
 
 //Posições pré-definidas para os servomotores que marcam os pontos do Braille
-const int centro = 90; // 90º
-const int direita = 135; // 120º
-const int esquerda = 45; // 60º - diferença de 30º entre o centro e o giro para um lado ou para o outro
+//const int centro = 90; // 90º
+const int centro_servo1_4 = 92;
+const int centro_servo2_3 = 84;
+const int centro_servo5_6 = 80;
+int direita = 135; // 120º
+int esquerda = 45; //60º
 
 //Definições necessárias para os motores de passo
 const int passosDoMotor = 200; // quantidade de passos de uma revolução de 360º do motor Nema 17 cujos passos são de 1,8º
-const int deslocamentoCaractere = 81;//40.5; // quantidade de passos do motor nema 17 para passar da posição de uma cela para a outra
-const int deslocamentoLinha = 96;//46; // quantidade de passos do motor nema 17 para passar da posição de uma linha para a outra
+const int deslocamentoCaractere = 80.95;//40.5; // quantidade de passos do motor nema 17 para passar da posição de uma cela para a outra
+const int deslocamentoLinha = 150;//96;//48; // quantidade de passos do motor nema 17 para passar da posição de uma linha para a outra
+const int deslocamentoPapelApagarCaractere = 4.7 * deslocamentoLinha;
 
 // Velocidades
 const int velocidadeEscrita = 80;
 const int velocidadeMovimentacao = 120;
 
 //Outras constantes
-const int maxCaracteresLinha = 21; // ainda precisa calcular corretamente
-const int maxLinhas = 30; // ainda precisa calcular corretamente
-const int tempoEntreGiros = 100;
-const int tempoRetornarCentro = 100;
+const int maxCaracteresLinha = 22;
+const int maxLinhas = 10; // ainda precisa calcular corretamente
+const int tempoSensibilidadeBotoes = 100; // tempo para reduzir sensibilidade nos botões. Ou seja, só começa a valer o botão pressionado após esse tempo
+//const int tempoEntreGiros = 100;
+//const int tempoRetornarCentro = 100;
 
 // **** Variáveis ****
 Servo servo1_4, servo5_6, servo2_3; //servo1_4, por exemplo, é responsável por marcar os pontos 1 e 4 da Cela Braille
@@ -58,24 +66,26 @@ int status_botao4 = 0;
 int status_botao5 = 0;
 int status_botao6 = 0;
 int status_botaoEspaco = 0;
-int status_botaoLinha = 0;
 int countCaracteres = 0;
 int countLinhas = 0;
-int quantAletaracoesLado = 3;
-int alteracaoLado = 20;
+//int quantAletaracoesLado = 3;
+//int alteracaoLado = 20;
 
 // **** Declaração das funções ****
 void lerBotoes();
 bool temBotaoPressionado();
+bool temBotaoComStatusAtivo();
+bool temBotaoNaoPressionadoComStatusAtivo();
 void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int status_botao4, int status_botao5, int status_botao6, int status_botaoEspaco);
 void posicionarProximaLinha();
 void posicionarProximoCaractere();
+void retornarPosicaoCarectereAnterior();
 void voltarInicioLinha();
 void posicionaInicioLinha();
 void liberarPagina();
 void puxarNovaPagina();
 void resetarStatus();
-
+void apagarCaractere();
 
 void setup() {
   Serial.begin(9600);
@@ -87,6 +97,8 @@ void setup() {
   pinMode(botao5, INPUT);
   pinMode(botao6, INPUT);
   pinMode(botaoEspaco, INPUT);
+  pinMode(botaoRetroceder, INPUT);
+  pinMode(botaoApagar, INPUT);
   pinMode(botaoLinha, INPUT);
   pinMode(botaoPosicaoInicial, INPUT);
   
@@ -94,51 +106,82 @@ void setup() {
   servo2_3.attach(portaServo2_3);
   servo5_6.attach(portaServo5_6);
   
-  servo1_4.write(centro);
-  servo2_3.write(centro);
-  servo5_6.write(centro);
+  servo1_4.write(centro_servo1_4);
+  servo2_3.write(centro_servo2_3);
+  servo5_6.write(centro_servo5_6);
 
   motorX.setSpeed(velocidadeEscrita);  
   motorY.setSpeed(velocidadeEscrita);
 
    pinMode(buzzer, OUTPUT);
    pinMode(fimDeCurso, INPUT);
+   pinMode(solenoide, OUTPUT);
+   digitalWrite(solenoide, LOW);
 
    posicionaInicioLinha();
 }
 
 void loop() {
-  lerBotoes();
-  /*if (digitalRead(botaoReset)){
-	  asm volatile ("  jmp 0");
-  }*/
 
   if (digitalRead(botaoPosicaoInicial)){
-    posicionaInicioLinha();
-    puxarNovaPagina();
+    delay(tempoSensibilidadeBotoes);
+    if (digitalRead(botaoPosicaoInicial)){
+      posicionaInicioLinha();
+      puxarNovaPagina();
+    }
   }
-  
-  if (status_botaoLinha){
-    if(!digitalRead(botaoLinha)){
+
+  if (digitalRead(botaoLinha)){
+    delay(tempoSensibilidadeBotoes);
+    if (digitalRead(botaoLinha)){
       posicionaProximaLinha();
-      resetarStatus();
       countCaracteres = 0;
     }
-  }else{
-    if((status_botao1 && !digitalRead(botao1)) || (status_botao2 && !digitalRead(botao2)) || (status_botao3 && !digitalRead(botao3)) || (status_botao4 && !digitalRead(botao4))
-               || (status_botao5 && !digitalRead(botao5)) || (status_botao6 && !digitalRead(botao6)) || (status_botaoEspaco && !digitalRead(botaoEspaco))){
-      while(temBotaoPressionado()){
-        lerBotoes();
-		    delay(10);
-	    }
-	  marcarPontos(status_botao1, status_botao2, status_botao3, status_botao4, status_botao5, status_botao6);
-    //posicionarProximoCaractere();
-	  resetarStatus();
+  }
+
+  if (digitalRead(botaoRetroceder)){
+    delay(tempoSensibilidadeBotoes);
+    if (digitalRead(botaoRetroceder)){
+      retornarPosicaoCarectereAnterior();
     }
   }
+
+  if (digitalRead(botaoApagar)){
+    delay(tempoSensibilidadeBotoes);
+    if (digitalRead(botaoApagar)){
+      apagarCaractere();
+    }
+  }
+  
+  //lerBotoes();
+
+  /*if (digitalRead(botaoReset)){
+    asm volatile ("  jmp 0");
+  }*/  
+  
+  if (temBotaoPressionado()){
+    delay(tempoSensibilidadeBotoes);
+    lerBotoes();
+
+    if (temBotaoComStatusAtivo()){
+      if(temBotaoNaoPressionadoComStatusAtivo()){
+          while(temBotaoPressionado()){
+            lerBotoes(); 
+            delay(10);
+          }
+          marcarPontos(status_botao1, status_botao2, status_botao3, status_botao4, status_botao5, status_botao6);
+          //posicionarProximoCaractere();
+          resetarStatus();
+      }
+      
+    }
+  }
+  
 }
 
 void lerBotoes(){
+
+  Serial.println("Método lerBotoes");
 
   if(digitalRead(botao1)){
     status_botao1 = 1;
@@ -167,63 +210,205 @@ void lerBotoes(){
   if(digitalRead(botaoEspaco)){
     status_botaoEspaco = 1;
   }
-
-  if(digitalRead(botaoLinha)){
-    status_botaoLinha = 1;
-  }
+  
 }
 
 bool temBotaoPressionado(){
 	return digitalRead(botao1) || digitalRead(botao2) || digitalRead(botao3) || digitalRead(botao4) || digitalRead(botao5) || digitalRead(botao6) || digitalRead(botaoEspaco);
 }
 
-void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int status_botao4, int status_botao5, int status_botao6){
+bool temBotaoComStatusAtivo(){
+  Serial.println("Método temBotaoComStatusAtivo");
+  return status_botao1 || status_botao2 || status_botao3 || status_botao4 || status_botao5 || status_botao6 || status_botaoEspaco;
+}
+
+bool temBotaoNaoPressionadoComStatusAtivo(){
+  Serial.println("Método temBotaoNaoPressionadoComStatusAtivo");
+  return (status_botao1 && !digitalRead(botao1)) || (status_botao2 && !digitalRead(botao2)) || (status_botao3 && !digitalRead(botao3)) || (status_botao4 && !digitalRead(botao4))
+                 || (status_botao5 && !digitalRead(botao5)) || (status_botao6 && !digitalRead(botao6)) || (status_botaoEspaco && !digitalRead(botaoEspaco));
+}
+
+/*void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int status_botao4, int status_botao5, int status_botao6){
+  Serial.println("Método marcarPontos");
+  int tempoEntreGiros = 200;
+  int tempoRetornarCentro = 200;
+  int tempoEntreServos = 100;
+  int fator = 10;
+  direita = 120;
+  esquerda = 60;
   if(status_botao1){
+    esquerda -= fator;
+    if(status_botao3){
+      esquerda -= fator;
+      if(status_botao5){
+        esquerda -= fator;
+        servo5_6.write(esquerda);
+        delay(tempoEntreServos);
+      }
+      servo2_3.write(esquerda);
+      delay(tempoEntreServos);
+    }else{
+      if(status_botao5){
+        esquerda -= fator;
+        servo5_6.write(esquerda);
+        delay(tempoEntreServos);
+      }
+    }
     servo1_4.write(esquerda);
-    delay(50);
+    delay(tempoEntreServos);
+  }else{
+    if(status_botao3){
+      esquerda -= fator;
+      if(status_botao5){
+        esquerda -= fator;
+        servo5_6.write(esquerda);
+        delay(tempoEntreServos);
+      }
+      servo2_3.write(esquerda);
+      delay(tempoEntreServos);
+    }else{
+      if(status_botao5){
+        esquerda -= fator;
+        servo5_6.write(esquerda);
+        delay(tempoEntreServos);
+      }
+    }
   }
-  if(status_botao3){
+  Serial.println("esquerda = " + String(esquerda));
+  /*if(status_botao3){
     servo2_3.write(esquerda);
-    delay(50);
   }
   if(status_botao5){
     servo5_6.write(esquerda);
-    delay(50);
-  }
+  }*/
 
-  if(status_botao1 || status_botao3 || status_botao5){
+  /*if(status_botao1 || status_botao3 || status_botao5){
     delay(tempoEntreGiros);
     servo1_4.write(centro);
     servo2_3.write(centro);
     servo5_6.write(centro);
     delay(tempoRetornarCentro);
   }
-  
+
   if(status_botao2){
+    direita += fator;
+    if(status_botao4){
+      direita += fator;
+      if(status_botao6){
+        direita += fator;
+        servo5_6.write(direita);
+        delay(tempoEntreServos);
+      }
+      servo1_4.write(direita);
+      delay(tempoEntreServos);
+    }else{
+      if(status_botao6){
+        direita += fator;
+        servo5_6.write(direita);
+        delay(tempoEntreServos);
+      }
+    }
     servo2_3.write(direita);
-    delay(50);
+    delay(tempoEntreServos);
+  }else{
+    if(status_botao4){
+      direita += fator;
+      if(status_botao6){
+        direita += fator;
+        servo5_6.write(direita);
+        delay(tempoEntreServos);
+      }
+      servo1_4.write(direita);
+      delay(tempoEntreServos);
+    }else{
+      if(status_botao6){
+        direita += fator;
+        servo5_6.write(direita);
+        delay(tempoEntreServos);
+      }
+    }
+  }
+  
+  /*if(status_botao2){
+    servo2_3.write(direita);
   }
   if(status_botao4){
     servo1_4.write(direita);
-    delay(50);
   }
   if(status_botao6){
     servo5_6.write(direita);
-    delay(50);
-    //girarServoMotor("direito", servo5_6);
-  }
+  }*/
 
-  if(status_botao2 || status_botao4 || status_botao6){
+  /*if(status_botao2 || status_botao4 || status_botao6){
     delay(tempoEntreGiros);
     servo1_4.write(centro);
     servo2_3.write(centro);
     servo5_6.write(centro);
+    delay(tempoRetornarCentro);
+  }
+  Serial.println("direita = " + String(direita));
+  posicionarProximoCaractere();
+}*/
+
+
+void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int status_botao4, int status_botao5, int status_botao6){
+  Serial.println("Método marcarPontos");
+  int tempoEntreServos = 150;
+  int tempoEntreGiros = 00;
+  int tempoRetornarCentro = 150;
+  int diferenca_centro = 45;
+  if(status_botao1){
+    esquerda = centro_servo1_4 - diferenca_centro;
+    servo1_4.write(esquerda);
+    delay(tempoEntreServos);
+  }
+  if(status_botao3){
+    esquerda = centro_servo2_3 - diferenca_centro;
+    servo2_3.write(esquerda);
+    delay(tempoEntreServos);
+  }
+  if(status_botao5){
+    esquerda = centro_servo5_6 - diferenca_centro;
+    servo5_6.write(esquerda);
+    delay(tempoEntreServos);
+  }
+
+  if(status_botao1 || status_botao3 || status_botao5){
+    delay(tempoEntreGiros);
+    servo1_4.write(centro_servo1_4);
+    servo2_3.write(centro_servo2_3);
+    servo5_6.write(centro_servo5_6);
+    delay(tempoRetornarCentro);
+  }
+  
+  if(status_botao2){
+    esquerda = centro_servo2_3 + diferenca_centro;
+    servo2_3.write(direita);
+    delay(tempoEntreServos);
+  }
+  if(status_botao4){
+    esquerda = centro_servo1_4 + diferenca_centro;
+    servo1_4.write(direita);
+    delay(tempoEntreServos);
+  }
+  if(status_botao6){
+    esquerda = centro_servo5_6 + diferenca_centro;
+    servo5_6.write(direita);
+    delay(tempoEntreServos);
+  }
+
+  if(status_botao2 || status_botao4 || status_botao6){
+    delay(tempoEntreGiros);
+    servo1_4.write(centro_servo1_4);
+    servo2_3.write(centro_servo2_3);
+    servo5_6.write(centro_servo5_6);
     delay(tempoRetornarCentro);
   }
   posicionarProximoCaractere();
 }
 
-void girarServoMotor(String lado, Servo &servo){
+/*void girarServoMotor(String lado, Servo &servo){
+  Serial.println("Método girarServoMotor");
   int valor = centro;
   Serial.println("lado = "+lado+", alteração = "+alteracaoLado);
   if (lado == "esquerdo"){
@@ -233,27 +418,33 @@ void girarServoMotor(String lado, Servo &servo){
   for (int i = 0; i < quantAletaracoesLado; i++){
     valor = valor + alteracaoLado;
     servo.write(valor);
-    delay(tempoEntreGiros);
+    //delay(tempoEntreGiros);
   }
-}
-
+}*/
 
 void posicionarProximoCaractere(){
+  Serial.println("Método posicionarProximoCaractere");
   countCaracteres++;
-  if (countCaracteres >= maxCaracteresLinha - 2){
+  Serial.println("Quant Caractere = " + String(countCaracteres));
+  /*if (countCaracteres >= maxCaracteresLinha - 2){
     // Aciona o buzzer na frequência relativa ao Ré em Hz   
     tone(buzzer,293);             
     delay(200);    
     noTone(buzzer);
-  }
+  }*/
   if (countCaracteres >= maxCaracteresLinha - 1){
-    delay(100);
+    //delay(100);
     // Aciona o buzzer na frequência relativa ao Ré em Hz   
     tone(buzzer,293);             
     delay(200);    
     noTone(buzzer);
   }
   if (countCaracteres >= maxCaracteresLinha){
+    delay(100);
+    // Aciona o buzzer na frequência relativa ao Ré em Hz   
+    tone(buzzer,293);             
+    delay(200);    
+    noTone(buzzer);
     //posicionarProximaLinha(countCaracteres);
     posicionaProximaLinha();
     countCaracteres = 0;
@@ -264,7 +455,64 @@ void posicionarProximoCaractere(){
   //Serial.println("Entrou para alimentar o motor X");
 }
 
+void retornarPosicaoCarectereAnterior(){
+  Serial.println("Método retornarPosicaoCarectereAnterior");
+  Serial.println("Quant Caractere = " + String(countCaracteres));
+  if (countCaracteres <= 2){
+    // Aciona o buzzer na frequência relativa ao Ré em Hz   
+    tone(buzzer,293);             
+    delay(200);    
+    noTone(buzzer);
+  }
+  if (countCaracteres <= 1){
+    delay(100);
+    // Aciona o buzzer na frequência relativa ao Ré em Hz   
+    tone(buzzer,293);             
+    delay(200);    
+    noTone(buzzer);
+  }
+  if (countCaracteres <= 0){
+    delay(100);
+    // Aciona o buzzer na frequência relativa ao Ré em Hz   
+    tone(buzzer,293);             
+    delay(200);    
+    noTone(buzzer);
+    countCaracteres = 0;
+    return;
+  }
+
+  if (countCaracteres > 0){
+    motorX.step(deslocamentoCaractere, FORWARD, metodoMotorPasso);
+    motorX.release();
+    countCaracteres--;
+    Serial.println("Quant Caractere 2 = " + String(countCaracteres));
+  } 
+}
+
+void apagarCaractere(){
+  Serial.println("Método apagarCaractere");
+  tone(buzzer,293);             
+  //delay(200);    
+  //noTone(buzzer);
+  motorY.step(deslocamentoPapelApagarCaractere, BACKWARD, metodoMotorPasso);
+  motorY.release();
+  noTone(buzzer);
+  //apaga
+  for (int i = 0; i < 5; i++){
+    Serial.println("Entrou no for");
+    digitalWrite(solenoide, HIGH);
+    delay(150); 
+    digitalWrite(solenoide, LOW);
+    delay(200); 
+  }
+  tone(buzzer,293); 
+  motorY.step(deslocamentoPapelApagarCaractere, FORWARD, metodoMotorPasso);
+  motorY.release();
+  noTone(buzzer);
+}
+
 void posicionaProximaLinha(){
+  Serial.println("Método posicionaProximaLinha");
   posicionaInicioLinha();
   countLinhas++;
   if (countLinhas >= maxLinhas){
@@ -277,6 +525,7 @@ void posicionaProximaLinha(){
 }
 
 void posicionarProximaLinha(int quantCarecteresDeslocamento){
+  Serial.println("Método posicionarProximaLinha");
   voltarInicioLinha(quantCarecteresDeslocamento);
   countLinhas++;
   if (countLinhas >= maxLinhas){
@@ -289,6 +538,7 @@ void posicionarProximaLinha(int quantCarecteresDeslocamento){
 }
 
 void posicionaInicioLinha(){
+  Serial.println("Método posicionaInicioLinha");
   motorX.setSpeed(velocidadeMovimentacao);
   while(!digitalRead(fimDeCurso)){
     motorX.step(1, FORWARD, metodoMotorPasso);
@@ -298,6 +548,7 @@ void posicionaInicioLinha(){
 }
 
 void voltarInicioLinha(int quantCarecteresDeslocamento){
+  Serial.println("Método voltarInicioLinha");
   int quantPassosRetornar = quantCarecteresDeslocamento * deslocamentoCaractere;
   motorX.setSpeed(velocidadeMovimentacao);
   motorX.step(quantPassosRetornar, FORWARD, metodoMotorPasso);
@@ -306,6 +557,7 @@ void voltarInicioLinha(int quantCarecteresDeslocamento){
 }
 
  void liberarPagina(){
+  Serial.println("Método liberarPagina");
   int deslocamentoLiberarPagina = deslocamentoLinha * 3; //quantidade de linhas para o final da página
   motorY.setSpeed(velocidadeMovimentacao);
   motorY.step(deslocamentoLiberarPagina, BACKWARD, metodoMotorPasso);
@@ -314,7 +566,8 @@ void voltarInicioLinha(int quantCarecteresDeslocamento){
  }
 
 void puxarNovaPagina(){ //acionado pelo botão de posicionar nova página - Futuramente pode ser controlado por um sensor que identifique o término do papel e início de outro
-  int deslocamentoPosicionarNovaPagina = deslocamentoLinha * 6; //quantidade de linhas para o final da página
+  Serial.println("Método puxarNovaPagina");
+  int deslocamentoPosicionarNovaPagina = deslocamentoLinha * 4; //quantidade de linhas para o final da página
   motorY.setSpeed(velocidadeMovimentacao);
   motorY.step(deslocamentoPosicionarNovaPagina, BACKWARD, metodoMotorPasso);
   motorY.release();
@@ -322,6 +575,7 @@ void puxarNovaPagina(){ //acionado pelo botão de posicionar nova página - Futu
 }
 
 void resetarStatus(){
+  Serial.println("Método resetarStatus");
     status_botao1 = 0;
     status_botao2 = 0;
     status_botao3 = 0;
@@ -329,8 +583,7 @@ void resetarStatus(){
     status_botao5 = 0;
     status_botao6 = 0;
     status_botaoEspaco = 0;
-    status_botaoLinha = 0;
-    if (alteracaoLado<0){
+    /*if (alteracaoLado<0){
       alteracaoLado = -alteracaoLado;
-    }
+    }*/
 }
