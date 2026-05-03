@@ -1,6 +1,20 @@
+
+
 // **** Bibliotecas ****
 #include <Servo.h>
 #include <AFMotor.h>
+#include <SPI.h>
+#include <SD.h>
+#include <TMRpcm.h>
+
+#define SD_CS 30
+TMRpcm audio;
+
+
+
+
+
+
 
 
 // **** Definições ****
@@ -18,7 +32,7 @@
 #define portaServo1_4 2
 #define portaServo2_3 10
 #define portaServo5_6 9
-#define buzzer 51
+#define buzzer 46
 #define fimDeCurso 48
 #define solenoide 47
 
@@ -88,8 +102,12 @@ void resetarStatus();
 void apagarCaractere();
 
 void setup() {
+  audio.speakerPin = 44; 
+  audio.play("test.wav");
+  delay(5000);
   Serial.begin(9600);
   //Define os pinos dos botões como entrada
+  
   pinMode(botao1, INPUT);
   pinMode(botao2, INPUT);
   pinMode(botao3, INPUT);
@@ -119,7 +137,65 @@ void setup() {
    digitalWrite(solenoide, LOW);
 
    posicionaInicioLinha();
+
+
+  pinMode(53, OUTPUT); 
+  audio.speakerPin = 44;
+  //Verificando SD
+  if (!SD.begin(SD_CS)) {
+    Serial.println("SD FAIL");
+  } else {
+    Serial.println("SD OK");
+  }
+
+  audio.setVolume(6);
+
 }
+
+
+//função que toca letra
+void tocarLetra(char letra) {
+  char nome[6];
+
+  nome[0] = letra;
+  nome[1] = '.';
+  nome[2] = 'w';
+  nome[3] = 'a';
+  nome[4] = 'v';
+  nome[5] = '\0';
+
+  Serial.print("Tocando: ");
+  Serial.println(nome);
+
+  audio.play(nome);
+}
+
+//converter Braille para letra
+char identificarLetra() {
+ 
+
+  if (status_botao1 && !status_botao2 && !status_botao3 && !status_botao4 && !status_botao5 && !status_botao6)
+    return 'A';
+
+  if (status_botao1 && status_botao2)
+    return 'B';
+
+  if (status_botao1 && status_botao4)
+    return 'C';
+
+  if (status_botao1 && status_botao4 && status_botao5)
+    return 'D';
+
+  if (status_botao1 && status_botao5)
+    return 'E';
+
+  
+
+  return '?'; // desconhecido
+}
+
+
+
 
 void loop() {
 
@@ -170,6 +246,12 @@ void loop() {
             delay(10);
           }
           marcarPontos(status_botao1, status_botao2, status_botao3, status_botao4, status_botao5, status_botao6);
+          //Chama o áudio
+          char letra = identificarLetra();
+
+          if (letra != '?') {
+            tocarLetra(letra);
+          }
           //posicionarProximoCaractere();
           resetarStatus();
       }
@@ -214,7 +296,7 @@ void lerBotoes(){
 }
 
 bool temBotaoPressionado(){
-	return digitalRead(botao1) || digitalRead(botao2) || digitalRead(botao3) || digitalRead(botao4) || digitalRead(botao5) || digitalRead(botao6) || digitalRead(botaoEspaco);
+  return digitalRead(botao1) || digitalRead(botao2) || digitalRead(botao3) || digitalRead(botao4) || digitalRead(botao5) || digitalRead(botao6) || digitalRead(botaoEspaco);
 }
 
 bool temBotaoComStatusAtivo(){
