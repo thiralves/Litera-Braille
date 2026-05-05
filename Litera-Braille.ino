@@ -93,6 +93,8 @@ void resetarStatus();
 void apagarCaractere();
 
 
+
+
 void setup() {
   Serial.begin(9600);
 
