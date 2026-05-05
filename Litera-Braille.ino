@@ -1,19 +1,10 @@
-
-
 // **** Bibliotecas ****
 #include <Servo.h>
 #include <AFMotor.h>
-#include <SPI.h>
-#include <SD.h>
-#include <TMRpcm.h>
 
-#define SD_CS 30
-TMRpcm audio;
+#include <DFRobotDFPlayerMini.h>
 
-
-
-
-
+DFRobotDFPlayerMini player;
 
 
 
@@ -32,7 +23,7 @@ TMRpcm audio;
 #define portaServo1_4 2
 #define portaServo2_3 10
 #define portaServo5_6 9
-#define buzzer 46
+#define buzzer 51
 #define fimDeCurso 48
 #define solenoide 47
 
@@ -101,13 +92,11 @@ void puxarNovaPagina();
 void resetarStatus();
 void apagarCaractere();
 
+
 void setup() {
-  audio.speakerPin = 44; 
-  audio.play("test.wav");
-  delay(5000);
   Serial.begin(9600);
-  //Define os pinos dos botões como entrada
-  
+
+  // ---------------- BOTÕES ----------------
   pinMode(botao1, INPUT);
   pinMode(botao2, INPUT);
   pinMode(botao3, INPUT);
@@ -119,81 +108,170 @@ void setup() {
   pinMode(botaoApagar, INPUT);
   pinMode(botaoLinha, INPUT);
   pinMode(botaoPosicaoInicial, INPUT);
-  
+
+  // ---------------- SERVOS ----------------
   servo1_4.attach(portaServo1_4);
   servo2_3.attach(portaServo2_3);
   servo5_6.attach(portaServo5_6);
-  
+
   servo1_4.write(centro_servo1_4);
   servo2_3.write(centro_servo2_3);
   servo5_6.write(centro_servo5_6);
 
+  // ---------------- MOTORES ----------------
   motorX.setSpeed(velocidadeEscrita);  
   motorY.setSpeed(velocidadeEscrita);
 
-   pinMode(buzzer, OUTPUT);
-   pinMode(fimDeCurso, INPUT);
-   pinMode(solenoide, OUTPUT);
-   digitalWrite(solenoide, LOW);
+  // ---------------- OUTROS ----------------
+  pinMode(buzzer, OUTPUT);
+  pinMode(fimDeCurso, INPUT);
+  pinMode(solenoide, OUTPUT);
+  digitalWrite(solenoide, LOW);
 
-   posicionaInicioLinha();
+  posicionaInicioLinha();
 
+  // ---------------- DFPLAYER ----------------
+  Serial1.begin(9600);
+  delay(1000); // (DFPlayer precisa disso)
 
-  pinMode(53, OUTPUT); 
-  audio.speakerPin = 44;
-  //Verificando SD
-  if (!SD.begin(SD_CS)) {
-    Serial.println("SD FAIL");
+  Serial.println("Iniciando DFPlayer...");
+
+  if (!player.begin(Serial1)) {
+    Serial.println("❌ DFPlayer NAO CONECTOU");
   } else {
-    Serial.println("SD OK");
+    Serial.println("✅ DFPlayer OK");
+
+    player.volume(30);   // volume (0–30)
+    delay(500);
+
+    // 🔊 SOM DE INICIALIZAÇÃO
+    player.play(500);
   }
-
-  audio.setVolume(6);
-
 }
 
 
-//função que toca letra
+
 void tocarLetra(char letra) {
-  char nome[6];
-
-  nome[0] = letra;
-  nome[1] = '.';
-  nome[2] = 'w';
-  nome[3] = 'a';
-  nome[4] = 'v';
-  nome[5] = '\0';
-
-  Serial.print("Tocando: ");
-  Serial.println(nome);
-
-  audio.play(nome);
+  if (!player.available()) return;
+  
+  int numero = letra - 'A' + 1; // A=1, B=2...
+  Serial.println(numero);
+  Serial.print("Tocando letra: ");
+  Serial.println(letra);
+  
+  player.play(numero);
+  
 }
 
-//converter Braille para letra
-char identificarLetra() {
- 
 
-  if (status_botao1 && !status_botao2 && !status_botao3 && !status_botao4 && !status_botao5 && !status_botao6)
+char identificarLetra() {
+
+  // A (1)
+  if (status_botao3 && !status_botao2 && !status_botao1 && !status_botao6 && !status_botao5 && !status_botao4)
     return 'A';
 
-  if (status_botao1 && status_botao2)
+  // B (1 2)
+  if (status_botao3 && status_botao2 && !status_botao1 && !status_botao6 && !status_botao5 && !status_botao4)
     return 'B';
 
-  if (status_botao1 && status_botao4)
+  // C (1 4)
+  if (status_botao3 && status_botao6 && !status_botao2 && !status_botao1 && !status_botao5 && !status_botao4)
     return 'C';
 
-  if (status_botao1 && status_botao4 && status_botao5)
+  // D (1 4 5)
+  if (status_botao3 && status_botao6 && status_botao5 && !status_botao2 && !status_botao1 && !status_botao4)
     return 'D';
 
-  if (status_botao1 && status_botao5)
+  // E (1 5)
+  if (status_botao3 && status_botao5 && !status_botao2 && !status_botao1 && !status_botao6 && !status_botao4)
     return 'E';
 
-  
+  // F (1 2 4)
+  if (status_botao3 && status_botao2 && status_botao6 && !status_botao1 && !status_botao5 && !status_botao4)
+    return 'F';
 
-  return '?'; // desconhecido
+  // G (1 2 4 5)
+  if (status_botao3 && status_botao2 && status_botao6 && status_botao5 && !status_botao1 && !status_botao4)
+    return 'G';
+
+  // H (1 2 5)
+  if (status_botao3 && status_botao2 && status_botao5 && !status_botao1 && !status_botao6 && !status_botao4)
+    return 'H';
+
+  // I (2 4)
+  if (!status_botao3 && status_botao2 && status_botao6 && !status_botao1 && !status_botao5 && !status_botao4)
+    return 'I';
+
+  // J (2 4 5)
+  if (!status_botao3 && status_botao2 && status_botao6 && status_botao5 && !status_botao1 && !status_botao4)
+    return 'J';
+
+  // K (1 3)
+  if (status_botao3 && status_botao1 && !status_botao2 && !status_botao6 && !status_botao5 && !status_botao4)
+    return 'K';
+
+  // L (1 2 3)
+  if (status_botao3 && status_botao2 && status_botao1 && !status_botao6 && !status_botao5 && !status_botao4)
+    return 'L';
+
+  // M (1 3 4)
+  if (status_botao3 && status_botao1 && status_botao6 && !status_botao2 && !status_botao5 && !status_botao4)
+    return 'M';
+
+  // N (1 3 4 5)
+  if (status_botao3 && status_botao1 && status_botao6 && status_botao5 && !status_botao2 && !status_botao4)
+    return 'N';
+
+  // O (1 3 5)
+  if (status_botao3 && status_botao1 && status_botao5 && !status_botao2 && !status_botao6 && !status_botao4)
+    return 'O';
+
+  // P (1 2 3 4)
+  if (status_botao3 && status_botao2 && status_botao1 && status_botao6 && !status_botao5 && !status_botao4)
+    return 'P';
+
+  // Q (1 2 3 4 5)
+  if (status_botao3 && status_botao2 && status_botao1 && status_botao6 && status_botao5 && !status_botao4)
+    return 'Q';
+
+  // R (1 2 3 5)
+  if (status_botao3 && status_botao2 && status_botao1 && status_botao5 && !status_botao6 && !status_botao4)
+    return 'R';
+
+  // S (2 3 4)
+  if (!status_botao3 && status_botao2 && status_botao1 && status_botao6 && !status_botao5 && !status_botao4)
+    return 'S';
+
+  // T (2 3 4 5)
+  if (!status_botao3 && status_botao2 && status_botao1 && status_botao6 && status_botao5 && !status_botao4)
+    return 'T';
+
+  // U (1 3 6)
+  if (status_botao3 && status_botao1 && status_botao4 && !status_botao2 && !status_botao6 && !status_botao5)
+    return 'U';
+
+  // V (1 2 3 6)
+  if (status_botao3 && status_botao2 && status_botao1 && status_botao4 && !status_botao6 && !status_botao5)
+    return 'V';
+
+  // W (2 4 5 6)
+  if (!status_botao3 && status_botao2 && !status_botao1 && status_botao6 && status_botao5 && status_botao4)
+    return 'W';
+
+  // X (1 3 4 6)
+  if (status_botao3 && status_botao1 && status_botao6 && status_botao4 && !status_botao2 && !status_botao5)
+    return 'X';
+
+  // Y (1 3 4 5 6)
+  if (status_botao3 && status_botao1 && status_botao6 && status_botao5 && status_botao4 && !status_botao2)
+    return 'Y';
+
+  // Z (1 3 5 6)
+  if (status_botao3 && status_botao1 && status_botao5 && status_botao4 && !status_botao2 && !status_botao6)
+    return 'Z';
+
+  return '?';
 }
-
 
 
 
@@ -246,13 +324,12 @@ void loop() {
             delay(10);
           }
           marcarPontos(status_botao1, status_botao2, status_botao3, status_botao4, status_botao5, status_botao6);
-          //Chama o áudio
+          //posicionarProximoCaractere();
           char letra = identificarLetra();
 
           if (letra != '?') {
             tocarLetra(letra);
           }
-          //posicionarProximoCaractere();
           resetarStatus();
       }
       
@@ -669,3 +746,4 @@ void resetarStatus(){
       alteracaoLado = -alteracaoLado;
     }*/
 }
+
