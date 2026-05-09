@@ -92,11 +92,10 @@ void puxarNovaPagina();
 void resetarStatus();
 void apagarCaractere();
 
-
-
-
+String textoLinha = "";
 void setup() {
   Serial.begin(9600);
+  Serial2.begin(9600); // HC05
 
   // ---------------- BOTÕES ----------------
   pinMode(botao1, INPUT);
@@ -134,7 +133,7 @@ void setup() {
 
   // ---------------- DFPLAYER ----------------
   Serial1.begin(9600);
-  delay(1000); // (DFPlayer precisa disso)
+  delay(1000); // 
 
   Serial.println("Iniciando DFPlayer...");
 
@@ -146,8 +145,8 @@ void setup() {
     player.volume(30);   // volume (0–30)
     delay(500);
 
-    // 🔊 SOM DE INICIALIZAÇÃO
-    player.play(500);
+    // 🔊 SOM DE INICIALIZAÇÃO (opcional)
+    player.playFolder(2, 1);
   }
 }
 
@@ -161,8 +160,8 @@ void tocarLetra(char letra) {
   Serial.print("Tocando letra: ");
   Serial.println(letra);
   
-  player.play(numero);
-  
+  player.playFolder(1, numero);
+  delay(300); // evita bug do DFPlayer
 }
 
 
@@ -276,12 +275,31 @@ char identificarLetra() {
 }
 
 
+void tocarComando(int numero) {
+  if (!player.available()) return;
+
+  Serial.print("Tocando comando: ");
+  Serial.println(numero);
+
+  player.playFolder(3, numero); // pasta 3 (comandos)
+  delay(300);
+}
+
+
+
 
 void loop() {
 
   if (digitalRead(botaoPosicaoInicial)){
     delay(tempoSensibilidadeBotoes);
     if (digitalRead(botaoPosicaoInicial)){
+      tocarComando(5); // 001 = Enter
+      Serial2.println(textoLinha);
+      Serial.print("Enviado Bluetooth: ");
+      Serial.println(textoLinha);
+
+  textoLinha = "";
+
       posicionaInicioLinha();
       puxarNovaPagina();
     }
@@ -290,6 +308,7 @@ void loop() {
   if (digitalRead(botaoLinha)){
     delay(tempoSensibilidadeBotoes);
     if (digitalRead(botaoLinha)){
+      tocarComando(2); // nova linha
       posicionaProximaLinha();
       countCaracteres = 0;
     }
@@ -298,16 +317,31 @@ void loop() {
   if (digitalRead(botaoRetroceder)){
     delay(tempoSensibilidadeBotoes);
     if (digitalRead(botaoRetroceder)){
+      tocarComando(4); // retroceder
       retornarPosicaoCarectereAnterior();
+      if (textoLinha.length() > 0) {  //Apagando do buffer
+        textoLinha.remove(textoLinha.length() - 1);
+}
     }
   }
 
   if (digitalRead(botaoApagar)){
     delay(tempoSensibilidadeBotoes);
     if (digitalRead(botaoApagar)){
+      tocarComando(1); //apagar
       apagarCaractere();
     }
   }
+
+  if (digitalRead(botaoEspaco)) {
+  delay(tempoSensibilidadeBotoes);
+  if (digitalRead(botaoEspaco)) {
+    tocarComando(3); // espaço
+    textoLinha += " "; //adicionado no buffer
+    posicionarProximoCaractere();
+    return; // importante pra não cair na leitura de letra
+  }
+}
   
   //lerBotoes();
 
@@ -330,7 +364,13 @@ void loop() {
           char letra = identificarLetra();
 
           if (letra != '?') {
+
             tocarLetra(letra);
+
+            textoLinha += letra;
+
+            Serial.print("Texto atual: ");
+            Serial.println(textoLinha);
           }
           resetarStatus();
       }
@@ -748,4 +788,3 @@ void resetarStatus(){
       alteracaoLado = -alteracaoLado;
     }*/
 }
-
