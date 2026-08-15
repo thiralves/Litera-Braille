@@ -9,11 +9,11 @@ DFRobotDFPlayerMini player;
 
 
 // **** Definições ****
-#define botao1 27 //porta serial
-#define botao2 25 //porta serial
-#define botao3 23 //porta serial
-#define botao4 31 //porta serial
-#define botao5 33 //porta serial
+#define botao2 27 //porta serial ok
+#define botao1 25 //porta serial ok
+#define botao3 23 //porta serial ok
+#define botao5 31 //porta serial
+#define botao4 33 //porta serial
 #define botao6 35 //porta serial
 #define botaoEspaco 29 //porta serial
 #define botaoApagar 37 //porta serial
