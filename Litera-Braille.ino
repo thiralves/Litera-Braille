@@ -623,59 +623,51 @@ void marcarPontos(int status_botao1, int status_botao2, int status_botao3, int s
   }
 }*/
 
+
 void posicionarProximoCaractere(){
   Serial.println("Método posicionarProximoCaractere");
   countCaracteres++;
   Serial.println("Quant Caractere = " + String(countCaracteres));
-  /*if (countCaracteres >= maxCaracteresLinha - 2){
-    // Aciona o buzzer na frequência relativa ao Ré em Hz   
-    tone(buzzer,293);             
-    delay(200);    
-    noTone(buzzer);
-  }*/
+  
   if (countCaracteres >= maxCaracteresLinha - 1){
-    //delay(100);
-    // Aciona o buzzer na frequência relativa ao Ré em Hz   
-    tone(buzzer,293);             
+    tone(buzzer,293);            
     delay(200);    
     noTone(buzzer);
   }
   if (countCaracteres >= maxCaracteresLinha){
     delay(100);
-    // Aciona o buzzer na frequência relativa ao Ré em Hz   
-    tone(buzzer,293);             
+    tone(buzzer,293);            
     delay(200);    
     noTone(buzzer);
-    //posicionarProximaLinha(countCaracteres);
     posicionaProximaLinha();
     countCaracteres = 0;
     return;
   }
-  motorX.step(deslocamentoCaractere, BACKWARD, metodoMotorPasso);
+  
+  // ALTERADO AQUI: Passa a ser FORWARD para ir no sentido do sensor
+  motorX.step(deslocamentoCaractere, FORWARD, metodoMotorPasso);
   motorX.release();
-  //Serial.println("Entrou para alimentar o motor X");
 }
+
 
 void retornarPosicaoCarectereAnterior(){
   Serial.println("Método retornarPosicaoCarectereAnterior");
   Serial.println("Quant Caractere = " + String(countCaracteres));
+  
   if (countCaracteres <= 2){
-    // Aciona o buzzer na frequência relativa ao Ré em Hz   
-    tone(buzzer,293);             
+    tone(buzzer,293);            
     delay(200);    
     noTone(buzzer);
   }
   if (countCaracteres <= 1){
     delay(100);
-    // Aciona o buzzer na frequência relativa ao Ré em Hz   
-    tone(buzzer,293);             
+    tone(buzzer,293);            
     delay(200);    
     noTone(buzzer);
   }
   if (countCaracteres <= 0){
     delay(100);
-    // Aciona o buzzer na frequência relativa ao Ré em Hz   
-    tone(buzzer,293);             
+    tone(buzzer,293);            
     delay(200);    
     noTone(buzzer);
     countCaracteres = 0;
@@ -683,7 +675,8 @@ void retornarPosicaoCarectereAnterior(){
   }
 
   if (countCaracteres > 0){
-    motorX.step(deslocamentoCaractere, FORWARD, metodoMotorPasso);
+    // ALTERADO AQUI: Passa a ser BACKWARD para retornar ao início lógico
+    motorX.step(deslocamentoCaractere, BACKWARD, metodoMotorPasso);
     motorX.release();
     countCaracteres--;
     Serial.println("Quant Caractere 2 = " + String(countCaracteres));
@@ -740,10 +733,30 @@ void posicionarProximaLinha(int quantCarecteresDeslocamento){
 
 void posicionaInicioLinha(){
   Serial.println("Método posicionaInicioLinha");
+  
+  // 1. Busca o referencial físico (fim de curso)
   motorX.setSpeed(velocidadeMovimentacao);
   while(!digitalRead(fimDeCurso)){
     motorX.step(1, FORWARD, metodoMotorPasso);
   }
+
+  // 2. Calcula a distância total para o outro lado
+  int passosParaOOutroLado = maxCaracteresLinha * deslocamentoCaractere;
+  
+  // 3. Define a zona de desaceleração (ex: equivalente a 2 ou 3 caracteres antes de parar)
+  int passosLentos = 2 * deslocamentoCaractere; 
+  int passosRapidos = passosParaOOutroLado - passosLentos;
+
+  // 4. Faz a maior parte da viagem em alta velocidade (120)
+  motorX.setSpeed(velocidadeMovimentacao);
+  motorX.step(passosRapidos, BACKWARD, metodoMotorPasso);
+
+  // 5. Reduz a velocidade bem no finalzinho para uma parada suave
+  // Você pode testar um valor entre 40 e 80 aqui para ver qual fica mais fluido
+  motorX.setSpeed(50); 
+  motorX.step(passosLentos, BACKWARD, metodoMotorPasso);
+
+  // Libera as bobinas e volta a velocidade para o padrão de escrita
   motorX.release();
   motorX.setSpeed(velocidadeEscrita);
 }
